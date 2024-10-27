@@ -16,7 +16,9 @@ export const updateBoardController = (
 
   const id: number = req.body.id;
 
-  board.updateBoard(id);
+  board.updateBoardWithId(id);
+  board.switchTurn();
   board.programMove();
+  board.switchTurn();
   res.status(200).json({ message: "Update success" });
 };
