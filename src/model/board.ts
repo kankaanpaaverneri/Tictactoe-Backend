@@ -4,6 +4,13 @@ export enum BoardSquareState {
   O = "O",
 }
 
+export enum WinningStatus {
+  DRAW = "DRAW",
+  X = "X",
+  O = "O",
+  NO_WINNER = " ",
+}
+
 export interface BoardSquare {
   state: BoardSquareState;
   id: number;
@@ -56,22 +63,44 @@ export class Board {
   private _verticalCoordinates: Coordinates[];
   private _diagonalLeftToRightCoordinates: Coordinates[];
   private _diagonalRightToLeftCoordinates: Coordinates[];
+  private _winner: WinningStatus;
 
-  constructor(playerMark: BoardSquareState, programMark: BoardSquareState) {
+  constructor() {
     this._board = intitialBoardState;
-    this._playerMark = playerMark;
-    this._programMark = programMark;
+    this._playerMark = BoardSquareState.EMPTY;
+    this._programMark = BoardSquareState.EMPTY;
     this._turnCount = 0;
-    this._turn = playerMark;
+    this._turn = BoardSquareState.EMPTY;
     this._programMoveId = 0;
     this._horizontalCoordinates = [];
     this._verticalCoordinates = [];
     this._diagonalLeftToRightCoordinates = [];
     this._diagonalRightToLeftCoordinates = [];
+    this._winner = WinningStatus.NO_WINNER;
+  }
+
+  public set playerMark(playerMark: BoardSquareState) {
+    this._playerMark = playerMark;
+  }
+
+  public set programMark(programMark: BoardSquareState) {
+    this._programMark = programMark;
+  }
+
+  public set turn(turn: BoardSquareState) {
+    this._turn = turn;
   }
 
   public get board() {
     return this._board;
+  }
+
+  public get turn() {
+    return this._turn;
+  }
+
+  public get winner() {
+    return this._winner;
   }
 
   public getTurnCount() {
@@ -95,17 +124,85 @@ export class Board {
     }
 
     //Second turn and above
-    this.readDirection(Direction.Horizontal, 2, 1, this._playerMark);
-    this.readDirection(Direction.Vertical, 2, 1, this._playerMark);
-    this.readDirection(Direction.DiagonalLeftToRight, 2, 1, this._playerMark);
-    this.readDirection(Direction.DiagonalRightToLeft, 2, 1, this._playerMark);
+    this.secondTurn();
+    this.updateBoardWithId(this._programMoveId);
+  }
 
+  public resetBoard() {
+    this._board = this._board.map((column: BoardSquare[]) => {
+      return column.map((square: BoardSquare) => {
+        square.state = BoardSquareState.EMPTY;
+        return square;
+      });
+    });
+    this._playerMark = BoardSquareState.EMPTY;
+    this._programMark = BoardSquareState.EMPTY;
+    this._turnCount = 0;
+    this._turn = BoardSquareState.EMPTY;
+    this._programMoveId = 0;
+    this._horizontalCoordinates = [];
+    this._verticalCoordinates = [];
+    this._diagonalLeftToRightCoordinates = [];
+    this._diagonalRightToLeftCoordinates = [];
+    this._winner = WinningStatus.NO_WINNER;
+  }
+
+  public switchTurn() {
+    this._turn =
+      this._turn === BoardSquareState.X
+        ? BoardSquareState.O
+        : BoardSquareState.X;
+    this.incrementTurnCount(1);
+  }
+
+  public readWinningStatus(): WinningStatus {
+    this.readAllDirections(3, 0, this._programMark);
+
+    if (this._winner === WinningStatus.O) {
+      console.log(`Winner is ${WinningStatus.O}`);
+      return WinningStatus.O;
+    }
+
+    this.readAllDirections(3, 0, this._playerMark);
+
+    if (this._winner === WinningStatus.X) {
+      console.log(`Winner is ${WinningStatus.X}`);
+      return WinningStatus.O;
+    }
+
+    if (this._winner === WinningStatus.NO_WINNER && this.readDraw() === 9) {
+      console.log("DRAW");
+      this._winner = WinningStatus.DRAW;
+      return WinningStatus.DRAW;
+    }
+    return WinningStatus.NO_WINNER;
+  }
+
+  private readDraw() {
+    let emptySquareCount = 0;
+    for (let column = 0; column < this._board.length; column++) {
+      for (let row = 0; row < this._board[column].length; row++) {
+        if (this._board[column][row].state !== BoardSquareState.EMPTY)
+          emptySquareCount++;
+      }
+    }
+    return emptySquareCount;
+  }
+
+  private printReadCoordinates() {
     console.log("horizontalCoordinates: ", this._horizontalCoordinates);
     console.log("verticalCoordinates: ", this._verticalCoordinates);
     console.log("diagonalLeftToRight: ", this._diagonalLeftToRightCoordinates);
     console.log("diagonalRightToLeft: ", this._diagonalRightToLeftCoordinates);
-    this.secondTurn();
-    this.updateBoardWithId(this._programMoveId);
+  }
+
+  private getAllReadCoordinates() {
+    return [
+      ...this._horizontalCoordinates,
+      ...this._verticalCoordinates,
+      ...this._diagonalLeftToRightCoordinates,
+      ...this._diagonalRightToLeftCoordinates,
+    ];
   }
 
   private firstTurn() {
@@ -127,68 +224,64 @@ export class Board {
   }
 
   private secondTurn() {
-    const allReadData: Coordinates[] = [
-      ...this._horizontalCoordinates,
-      ...this._verticalCoordinates,
-      ...this._diagonalLeftToRightCoordinates,
-      ...this._diagonalRightToLeftCoordinates,
-    ];
-
-    if (allReadData.length === 0) {
-      this.readDirection(Direction.Horizontal, 1, 2, this._programMark);
-      this.readDirection(Direction.Vertical, 1, 2, this._programMark);
-      this.readDirection(
-        Direction.DiagonalLeftToRight,
-        1,
-        2,
-        this._programMark,
-      );
-      this.readDirection(
-        Direction.DiagonalRightToLeft,
-        1,
-        2,
-        this._programMark,
-      );
-      const allProgramReadData: Coordinates[] = [
-        ...this._horizontalCoordinates,
-        ...this._verticalCoordinates,
-        ...this._diagonalLeftToRightCoordinates,
-        ...this._diagonalRightToLeftCoordinates,
-      ];
-      allProgramReadData.forEach(({ x, y }: Coordinates) => {
-        if (this._board[y][x].state === BoardSquareState.EMPTY)
-          this._programMoveId = this._board[y][x].id;
-      });
+    this.readAllDirections(2, 1, this._playerMark);
+    const firstCoordinates: Coordinates[] = this.getAllReadCoordinates();
+    if (firstCoordinates.length > 0) {
+      this.setProgramMoveId(firstCoordinates);
       return;
     }
 
-    allReadData.forEach(({ x, y }: Coordinates) => {
+    this.readAllDirections(1, 2, this._programMark);
+    const secondaryCoordinates: Coordinates[] = this.getAllReadCoordinates();
+    if (secondaryCoordinates.length > 0) {
+      this.setProgramMoveId(secondaryCoordinates);
+      return;
+    }
+
+    this.readAllDirections(2, 1, this._programMark);
+    const thirdCoordinates: Coordinates[] = this.getAllReadCoordinates();
+    if (thirdCoordinates.length > 0) {
+      this.setProgramMoveId(thirdCoordinates);
+      return;
+    }
+  }
+
+  private setProgramMoveId(allCoordinates: Coordinates[]) {
+    allCoordinates.forEach(({ x, y }: Coordinates) => {
       if (this._board[y][x].state === BoardSquareState.EMPTY)
         this._programMoveId = this._board[y][x].id;
     });
   }
 
-  resetBoard() {
-    this._board = this._board.map((column: BoardSquare[]) => {
-      return column.map((square: BoardSquare) => {
-        square.state = BoardSquareState.EMPTY;
-        return square;
-      });
-    });
-    this._turnCount = 0;
-    this._turn = this._playerMark;
-  }
-
-  public switchTurn() {
-    this._turn =
-      this._turn === BoardSquareState.X
-        ? BoardSquareState.O
-        : BoardSquareState.X;
-    this.incrementTurnCount(1);
-  }
-
-  private incrementTurnCount(amount: number) {
-    this._turnCount += amount;
+  private readAllDirections(
+    markLimit: number,
+    emptySquareLimit: number,
+    readMarkType: BoardSquareState,
+  ) {
+    this.readDirection(
+      Direction.Horizontal,
+      markLimit,
+      emptySquareLimit,
+      readMarkType,
+    );
+    this.readDirection(
+      Direction.Vertical,
+      markLimit,
+      emptySquareLimit,
+      readMarkType,
+    );
+    this.readDirection(
+      Direction.DiagonalLeftToRight,
+      markLimit,
+      emptySquareLimit,
+      readMarkType,
+    );
+    this.readDirection(
+      Direction.DiagonalRightToLeft,
+      markLimit,
+      emptySquareLimit,
+      readMarkType,
+    );
   }
 
   //Read Board Vertical or Horizontal direction
@@ -218,18 +311,42 @@ export class Board {
         this.countSquaresByStateInDirection(column, direction, readMarkType);
 
       if (markCount === markLimit && emptySquareCount === emptySquareLimit) {
-        const coordinates = this.getPotentialCoordinates(column, direction);
-
-        if (direction === Direction.Horizontal) {
-          this._horizontalCoordinates.push({
-            ...coordinates,
-          });
-        }
-
-        if (direction === Direction.Vertical) {
-          this._verticalCoordinates.push({ ...coordinates });
-        }
+        if (this.readWinner(markLimit, emptySquareLimit)) return;
+        this.readCoordinates(direction, column);
       }
+    }
+  }
+
+  private readWinner(markLimit: number, emptySquareLimit: number): boolean {
+    if (markLimit === 3 && emptySquareLimit === 0) {
+      if (this._turn === BoardSquareState.X) this._winner = WinningStatus.X;
+
+      if (this._turn === BoardSquareState.O) this._winner = WinningStatus.O;
+
+      return true;
+    }
+
+    return false;
+  }
+
+  private readCoordinates(direction: Direction, column: number) {
+    const coordinates = this.getPotentialCoordinates(column, direction);
+
+    if (direction === Direction.Horizontal) {
+      this._horizontalCoordinates.push({
+        ...coordinates,
+      });
+    }
+    if (direction === Direction.Vertical) {
+      this._verticalCoordinates.push({ ...coordinates });
+    }
+
+    if (direction === Direction.DiagonalLeftToRight) {
+      this._diagonalLeftToRightCoordinates.push({ ...coordinates });
+    }
+
+    if (direction === Direction.DiagonalRightToLeft) {
+      this._diagonalRightToLeftCoordinates.push({ ...coordinates });
     }
   }
 
@@ -248,16 +365,9 @@ export class Board {
     if (direction === Direction.DiagonalRightToLeft)
       this._diagonalRightToLeftCoordinates = [];
 
-    if (markCount === 2 && emptySquareCount === 1) {
-      const coordinates = this.getPotentialCoordinates(0, direction);
-
-      if (direction === Direction.DiagonalLeftToRight) {
-        this._diagonalLeftToRightCoordinates.push({ ...coordinates });
-      }
-
-      if (direction === Direction.DiagonalRightToLeft) {
-        this._diagonalRightToLeftCoordinates.push({ ...coordinates });
-      }
+    if (markCount === markLimit && emptySquareCount === emptySquareLimit) {
+      if (this.readWinner(markLimit, emptySquareLimit)) return;
+      this.readCoordinates(direction, 0);
     }
   }
 
@@ -340,6 +450,9 @@ export class Board {
       y: NoCoordinate,
     };
   }
+  private incrementTurnCount(amount: number) {
+    this._turnCount += amount;
+  }
 }
 
-export const board: Board = new Board(BoardSquareState.X, BoardSquareState.O);
+export const board: Board = new Board();

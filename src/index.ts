@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 const app = express();
@@ -11,4 +11,6 @@ import boardRoutes from "./routes/boardRoutes";
 
 app.use("/", boardRoutes);
 
-app.listen(port);
+app.listen(port, () => {
+  console.log("listening...");
+});

@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction } from "express";
 import { board } from "../model/board";
 
 export const getBoardController = (
@@ -6,8 +6,8 @@ export const getBoardController = (
   res: Response,
   next: NextFunction,
 ) => {
-  console.log("Terve");
   res.status(200).json({
     board: board.board,
+    winner: board.winner,
   });
 };
