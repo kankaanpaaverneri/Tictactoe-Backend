@@ -91,23 +91,23 @@ export class Board {
     this._turn = turn;
   }
 
-  public get board() {
+  public get board(): BoardSquare[][] {
     return this._board;
   }
 
-  public get turn() {
+  public get turn(): BoardSquareState {
     return this._turn;
   }
 
-  public get winner() {
+  public get winner(): WinningStatus {
     return this._winner;
   }
 
-  public getTurnCount() {
+  public getTurnCount(): number {
     return this._turnCount;
   }
 
-  public updateBoardWithId(id: number) {
+  public updateBoardWithId(id: number): void {
     this._board.forEach((column) => {
       column.forEach((row) => {
         if (row.state === BoardSquareState.EMPTY && row.id === id)
@@ -116,7 +116,7 @@ export class Board {
     });
   }
 
-  public programMove() {
+  public programMove(): void {
     if (this._turnCount <= 1) {
       this.firstTurn();
       this.updateBoardWithId(this._programMoveId);
@@ -124,11 +124,11 @@ export class Board {
     }
 
     //Second turn and above
-    this.secondTurn();
+    this.futureTurns();
     this.updateBoardWithId(this._programMoveId);
   }
 
-  public resetBoard() {
+  public resetBoard(): void {
     this._board = this._board.map((column: BoardSquare[]) => {
       return column.map((square: BoardSquare) => {
         square.state = BoardSquareState.EMPTY;
@@ -147,7 +147,7 @@ export class Board {
     this._winner = WinningStatus.NO_WINNER;
   }
 
-  public switchTurn() {
+  public switchTurn(): void {
     this._turn =
       this._turn === BoardSquareState.X
         ? BoardSquareState.O
@@ -159,26 +159,23 @@ export class Board {
     this.readAllDirections(3, 0, this._programMark);
 
     if (this._winner === WinningStatus.O) {
-      console.log(`Winner is ${WinningStatus.O}`);
       return WinningStatus.O;
     }
 
     this.readAllDirections(3, 0, this._playerMark);
 
     if (this._winner === WinningStatus.X) {
-      console.log(`Winner is ${WinningStatus.X}`);
       return WinningStatus.O;
     }
 
     if (this._winner === WinningStatus.NO_WINNER && this.readDraw() === 9) {
-      console.log("DRAW");
       this._winner = WinningStatus.DRAW;
       return WinningStatus.DRAW;
     }
     return WinningStatus.NO_WINNER;
   }
 
-  private readDraw() {
+  private readDraw(): number {
     let emptySquareCount = 0;
     for (let column = 0; column < this._board.length; column++) {
       for (let row = 0; row < this._board[column].length; row++) {
@@ -189,14 +186,14 @@ export class Board {
     return emptySquareCount;
   }
 
-  private printReadCoordinates() {
+  private printReadCoordinates(): void {
     console.log("horizontalCoordinates: ", this._horizontalCoordinates);
     console.log("verticalCoordinates: ", this._verticalCoordinates);
     console.log("diagonalLeftToRight: ", this._diagonalLeftToRightCoordinates);
     console.log("diagonalRightToLeft: ", this._diagonalRightToLeftCoordinates);
   }
 
-  private getAllReadCoordinates() {
+  private getAllReadCoordinates(): Coordinates[] {
     return [
       ...this._horizontalCoordinates,
       ...this._verticalCoordinates,
@@ -205,7 +202,7 @@ export class Board {
     ];
   }
 
-  private firstTurn() {
+  private firstTurn(): void {
     if (this._board[1][1].state === BoardSquareState.EMPTY) {
       this._programMoveId = this._board[1][1].id;
     } else {
@@ -223,7 +220,7 @@ export class Board {
     }
   }
 
-  private secondTurn() {
+  private futureTurns(): void {
     this.readAllDirections(2, 1, this._playerMark);
     const firstCoordinates: Coordinates[] = this.getAllReadCoordinates();
     if (firstCoordinates.length > 0) {
@@ -244,9 +241,16 @@ export class Board {
       this.setProgramMoveId(thirdCoordinates);
       return;
     }
+
+    this.readAllDirections(1, 1, this._programMark);
+    const fourthCoordinates: Coordinates[] = this.getAllReadCoordinates();
+    if (fourthCoordinates.length > 0) {
+      this.setProgramMoveId(fourthCoordinates);
+      return;
+    }
   }
 
-  private setProgramMoveId(allCoordinates: Coordinates[]) {
+  private setProgramMoveId(allCoordinates: Coordinates[]): void {
     allCoordinates.forEach(({ x, y }: Coordinates) => {
       if (this._board[y][x].state === BoardSquareState.EMPTY)
         this._programMoveId = this._board[y][x].id;
@@ -257,7 +261,7 @@ export class Board {
     markLimit: number,
     emptySquareLimit: number,
     readMarkType: BoardSquareState,
-  ) {
+  ): void {
     this.readDirection(
       Direction.Horizontal,
       markLimit,
@@ -312,7 +316,7 @@ export class Board {
 
       if (markCount === markLimit && emptySquareCount === emptySquareLimit) {
         if (this.readWinner(markLimit, emptySquareLimit)) return;
-        this.readCoordinates(direction, column);
+        this.pushCoordinatesInArray(direction, column);
       }
     }
   }
@@ -329,7 +333,8 @@ export class Board {
     return false;
   }
 
-  private readCoordinates(direction: Direction, column: number) {
+  //push all po
+  private pushCoordinatesInArray(direction: Direction, column: number): void {
     const coordinates = this.getPotentialCoordinates(column, direction);
 
     if (direction === Direction.Horizontal) {
@@ -367,7 +372,7 @@ export class Board {
 
     if (markCount === markLimit && emptySquareCount === emptySquareLimit) {
       if (this.readWinner(markLimit, emptySquareLimit)) return;
-      this.readCoordinates(direction, 0);
+      this.pushCoordinatesInArray(direction, 0);
     }
   }
 
@@ -405,21 +410,25 @@ export class Board {
         if (direction === Direction.Horizontal) {
           coordinates.y = column;
           coordinates.x = row;
+          return coordinates;
         }
 
         if (direction === Direction.Vertical) {
           coordinates.y = row;
           coordinates.x = column;
+          return coordinates;
         }
 
         if (direction === Direction.DiagonalLeftToRight) {
           coordinates.y = column + row;
           coordinates.x = row;
+          return coordinates;
         }
 
         if (direction === Direction.DiagonalRightToLeft) {
           coordinates.y = row;
           coordinates.x = 2 - row;
+          return coordinates;
         }
       }
     }
@@ -450,7 +459,7 @@ export class Board {
       y: NoCoordinate,
     };
   }
-  private incrementTurnCount(amount: number) {
+  private incrementTurnCount(amount: number): void {
     this._turnCount += amount;
   }
 }
