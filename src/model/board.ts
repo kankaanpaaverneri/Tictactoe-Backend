@@ -34,6 +34,13 @@ interface CountResults {
   markCount: number;
 }
 
+interface ReadDirections {
+  readHorizontal: boolean;
+  readVertical: boolean;
+  readDiagonalLeftToRight: boolean;
+  readDiagonalRightToLeft: boolean;
+}
+
 const intitialBoardState: BoardSquare[][] = [
   [
     { state: BoardSquareState.EMPTY, id: 1 },
@@ -59,10 +66,6 @@ export class Board {
   private _turnCount: number;
   private _turn: BoardSquareState;
   private _programMoveId: number;
-  private _horizontalCoordinates: Coordinates[];
-  private _verticalCoordinates: Coordinates[];
-  private _diagonalLeftToRightCoordinates: Coordinates[];
-  private _diagonalRightToLeftCoordinates: Coordinates[];
   private _winner: WinningStatus;
 
   constructor() {
@@ -72,10 +75,6 @@ export class Board {
     this._turnCount = 0;
     this._turn = BoardSquareState.EMPTY;
     this._programMoveId = 0;
-    this._horizontalCoordinates = [];
-    this._verticalCoordinates = [];
-    this._diagonalLeftToRightCoordinates = [];
-    this._diagonalRightToLeftCoordinates = [];
     this._winner = WinningStatus.NO_WINNER;
   }
 
@@ -118,14 +117,23 @@ export class Board {
 
   public programMove(): void {
     if (this._turnCount <= 1) {
-      this.firstTurn();
-      this.updateBoardWithId(this._programMoveId);
+      const programMoveId: number = this.firstTurn();
+      if (programMoveId !== 0) this.updateBoardWithId(programMoveId);
       return;
     }
 
-    //Second turn and above
-    this.secondTurn();
-    this.updateBoardWithId(this._programMoveId);
+    //Second turn
+    if (this._turnCount === 3) {
+      const programMoveId: number = this.secondTurn();
+      if (programMoveId !== 0) this.updateBoardWithId(programMoveId);
+      return;
+    }
+
+    if (this._turnCount > 3) {
+      const programMoveId: number = this.restOfTheTurns();
+      if (programMoveId !== 0) this.updateBoardWithId(programMoveId);
+      return;
+    }
   }
 
   public resetBoard(): void {
@@ -140,10 +148,6 @@ export class Board {
     this._turnCount = 0;
     this._turn = BoardSquareState.EMPTY;
     this._programMoveId = 0;
-    this._horizontalCoordinates = [];
-    this._verticalCoordinates = [];
-    this._diagonalLeftToRightCoordinates = [];
-    this._diagonalRightToLeftCoordinates = [];
     this._winner = WinningStatus.NO_WINNER;
   }
 
@@ -156,13 +160,23 @@ export class Board {
   }
 
   public readWinningStatus(): WinningStatus {
-    this.readAllDirections(3, 0, this._programMark);
+    this.readSpecifiedDirections(3, 0, this._programMark, {
+      readVertical: false,
+      readHorizontal: false,
+      readDiagonalLeftToRight: false,
+      readDiagonalRightToLeft: false,
+    });
 
     if (this._winner === WinningStatus.O) {
       return WinningStatus.O;
     }
 
-    this.readAllDirections(3, 0, this._playerMark);
+    this.readSpecifiedDirections(3, 0, this._playerMark, {
+      readVertical: false,
+      readHorizontal: false,
+      readDiagonalLeftToRight: false,
+      readDiagonalRightToLeft: false,
+    });
 
     if (this._winner === WinningStatus.X) {
       return WinningStatus.O;
@@ -186,45 +200,9 @@ export class Board {
     return emptySquareCount;
   }
 
-  private printReadCoordinates(): void {
-    console.log("horizontalCoordinates: ", this._horizontalCoordinates);
-    console.log("verticalCoordinates: ", this._verticalCoordinates);
-    console.log("diagonalLeftToRight: ", this._diagonalLeftToRightCoordinates);
-    console.log("diagonalRightToLeft: ", this._diagonalRightToLeftCoordinates);
-  }
-
-  private getAllReadCoordinates(): Coordinates[] {
-    return [
-      ...this._horizontalCoordinates,
-      ...this._verticalCoordinates,
-      ...this._diagonalLeftToRightCoordinates,
-      ...this._diagonalRightToLeftCoordinates,
-    ];
-  }
-
-  private firstTurn(): void {
-    for (let column = 0; column < this._board.length; column++) {
-      for (let row = 0; row < this._board[column].length; row++) {
-        const currentSquare = this._board[column][row];
-
-        if (this.isSideSquareOccupied(currentSquare, [4, 6])) {
-          this.readDirection(Direction.Vertical, 1, 2, this._playerMark);
-          const coordinates: Coordinates[] = this.getAllReadCoordinates();
-          this.setProgramMoveId(coordinates);
-          return;
-        }
-
-        if (this.isSideSquareOccupied(currentSquare, [2, 8])) {
-          this.readDirection(Direction.Horizontal, 1, 2, this._playerMark);
-          const coordinates: Coordinates[] = this.getAllReadCoordinates();
-          this.setProgramMoveId(coordinates);
-          return;
-        }
-      }
-    }
-
-    if (this._board[1][1].state === BoardSquareState.EMPTY)
-      this._programMoveId = 5;
+  private firstTurn(): number {
+    let programMoveId: number = 0;
+    if (this._board[1][1].state === BoardSquareState.EMPTY) programMoveId = 5;
     else {
       for (let column = 0; column < this._board.length; column++) {
         for (let row = 0; row < this._board[column].length; column++) {
@@ -234,103 +212,202 @@ export class Board {
             column !== 1 &&
             row !== 1
           ) {
-            this._programMoveId = currentSquare.id;
-            return;
+            return currentSquare.id;
           }
         }
       }
     }
+    return programMoveId;
   }
 
-  private isSideSquareOccupied(
-    currentSquare: BoardSquare,
-    sideSquareIds: number[],
-  ): boolean {
-    let sideSquareOccupied: boolean = false;
-    sideSquareIds.forEach((id: number) => {
-      if (id === currentSquare.id && currentSquare.state === this._playerMark) {
-        sideSquareOccupied = true;
-      }
-    });
-    return sideSquareOccupied;
+  private secondTurn(): number {
+    const allCoordinates: Coordinates[] = this.readSpecifiedDirections(
+      2,
+      1,
+      this._playerMark,
+      {
+        readHorizontal: true,
+        readVertical: true,
+        readDiagonalLeftToRight: true,
+        readDiagonalRightToLeft: true,
+      },
+    );
+    if (allCoordinates.length === 0) {
+      //Try to make progress on winning
+      return this.programTryToWin({
+        readHorizontal: true,
+        readVertical: true,
+        readDiagonalLeftToRight: false,
+        readDiagonalRightToLeft: false,
+      });
+    }
+
+    //Block player marks
+    return this.getProgramMoveId(allCoordinates);
   }
 
-  private secondTurn(): void {
-    console.log("REST OF THE TURNS");
+  private restOfTheTurns(): number {
+    const playerMarkBlockCoordinates: Coordinates[] =
+      this.readSpecifiedDirections(2, 1, this._playerMark, {
+        readHorizontal: true,
+        readVertical: true,
+        readDiagonalLeftToRight: true,
+        readDiagonalRightToLeft: true,
+      });
 
-    this.readAllDirections(2, 1, this._playerMark);
-    const
+    if (playerMarkBlockCoordinates.length === 0) {
+      return this.programTryToWin({
+        readHorizontal: true,
+        readVertical: true,
+        readDiagonalLeftToRight: true,
+        readDiagonalRightToLeft: true,
+      });
+    }
+
+    return this.getProgramMoveId(playerMarkBlockCoordinates);
   }
 
-  private setProgramMoveId(allCoordinates: Coordinates[]): void {
+  private programTryToWin(readDirections: ReadDirections): number {
+    let programMoveId: number = 0;
+    const oneMarkTwoEmptySquares: Coordinates[] = this.readSpecifiedDirections(
+      1,
+      2,
+      this._programMark,
+      readDirections,
+    );
+    if (oneMarkTwoEmptySquares.length > 0) {
+      programMoveId = this.getProgramMoveId(oneMarkTwoEmptySquares);
+    } else {
+      const oneMarkOneEmptySquare: Coordinates[] = this.readSpecifiedDirections(
+        1,
+        1,
+        this._programMark,
+        readDirections,
+      );
+
+      const twoMarksOneEmptySquare: Coordinates[] =
+        this.readSpecifiedDirections(2, 1, this._programMark, readDirections);
+
+      const restOfTheCoordinates: Coordinates[] = [
+        ...oneMarkOneEmptySquare,
+        ...twoMarksOneEmptySquare,
+      ];
+
+      programMoveId = this.getProgramMoveId(restOfTheCoordinates);
+    }
+    return programMoveId;
+  }
+
+  private getProgramMoveId(allCoordinates: Coordinates[]): number {
+    let programMoveId: number = 0;
     allCoordinates.forEach(({ x, y }: Coordinates) => {
       if (this._board[y][x].state === BoardSquareState.EMPTY)
-        this._programMoveId = this._board[y][x].id;
+        programMoveId = this._board[y][x].id;
     });
+    return programMoveId;
   }
 
-  private readAllDirections(
-    markLimit: number,
-    emptySquareLimit: number,
+  private readSpecifiedDirections(
+    readMarkLimit: number,
+    readEmptySquareLimit: number,
     readMarkType: BoardSquareState,
-  ): void {
-    this.readDirection(
+    directions: ReadDirections,
+  ): Coordinates[] {
+    const {
+      readHorizontal,
+      readVertical,
+      readDiagonalLeftToRight,
+      readDiagonalRightToLeft,
+    }: ReadDirections = directions;
+
+    const horizontalCoordinates: Coordinates[] = this.readDirection(
       Direction.Horizontal,
-      markLimit,
-      emptySquareLimit,
+      readMarkLimit,
+      readEmptySquareLimit,
       readMarkType,
     );
-    this.readDirection(
+    const verticalCoordinates: Coordinates[] = this.readDirection(
       Direction.Vertical,
-      markLimit,
-      emptySquareLimit,
+      readMarkLimit,
+      readEmptySquareLimit,
       readMarkType,
     );
-    this.readDirection(
+    const diagonalLeftToRightCoordinates: Coordinates[] = this.readDirection(
       Direction.DiagonalLeftToRight,
-      markLimit,
-      emptySquareLimit,
+      readMarkLimit,
+      readEmptySquareLimit,
       readMarkType,
     );
-    this.readDirection(
+    const diagonalRightToLeftCoordinates: Coordinates[] = this.readDirection(
       Direction.DiagonalRightToLeft,
-      markLimit,
-      emptySquareLimit,
+      readMarkLimit,
+      readEmptySquareLimit,
       readMarkType,
     );
+
+    const allCoordinatesArray: Coordinates[] = [];
+
+    if (readHorizontal) allCoordinatesArray.push(...horizontalCoordinates);
+    if (readVertical) allCoordinatesArray.push(...verticalCoordinates);
+    if (readDiagonalLeftToRight)
+      allCoordinatesArray.push(...diagonalLeftToRightCoordinates);
+    if (readDiagonalRightToLeft)
+      allCoordinatesArray.push(...diagonalRightToLeftCoordinates);
+
+    return allCoordinatesArray;
+  }
+
+  private printAllCoordinates(
+    horizontal: Coordinates[],
+    vertical: Coordinates[],
+    diagonalLR: Coordinates[],
+    diagonalRL: Coordinates[],
+  ): void {
+    console.log("horizontalCoordinates: ", horizontal);
+    console.log("verticalCoordinates: ", vertical);
+    console.log("diagonalLeftToRight: ", diagonalLR);
+    console.log("diagonalRightToLeft: ", diagonalRL);
   }
 
   //Read Board Vertical or Horizontal direction
   private readDirection(
     direction: Direction,
-    markLimit: number,
-    emptySquareLimit: number,
+    readMarkLimit: number,
+    readEmptySquareLimit: number,
     readMarkType: BoardSquareState,
-  ): void {
+  ): Coordinates[] {
+    const coordinatesArray: Coordinates[] = [];
+
     if (
       direction === Direction.DiagonalLeftToRight ||
       direction === Direction.DiagonalRightToLeft
     ) {
-      this.readDiagonalDirection(
+      return this.readDiagonalDirection(
         direction,
-        markLimit,
-        emptySquareLimit,
+        readMarkLimit,
+        readEmptySquareLimit,
         readMarkType,
       );
-      return;
     }
-    if (direction === Direction.Horizontal) this._horizontalCoordinates = [];
-    if (direction === Direction.Vertical) this._verticalCoordinates = [];
 
     for (let column = 0; column < this._board.length; column++) {
       const { emptySquareCount, markCount }: CountResults =
         this.countSquaresByStateInDirection(column, direction, readMarkType);
 
-      if (markCount === markLimit && emptySquareCount === emptySquareLimit) {
-        if (this.readWinner(markLimit, emptySquareLimit)) return;
-        this.pushCoordinatesInArray(direction, column);
+      if (
+        markCount === readMarkLimit &&
+        emptySquareCount === readEmptySquareLimit
+      ) {
+        if (this.readWinner(readMarkLimit, readEmptySquareLimit)) return [];
+
+        const coordinates: Coordinates[] = this.getCoordinates(
+          column,
+          direction,
+        );
+        coordinatesArray.push(...coordinates);
       }
     }
+    return coordinatesArray;
   }
 
   private readWinner(markLimit: number, emptySquareLimit: number): boolean {
@@ -345,47 +422,24 @@ export class Board {
     return false;
   }
 
-  //push all po
-  private pushCoordinatesInArray(direction: Direction, column: number): void {
-    const coordinates = this.getPotentialCoordinates(column, direction);
-
-    if (direction === Direction.Horizontal) {
-      this._horizontalCoordinates.push({
-        ...coordinates,
-      });
-    }
-    if (direction === Direction.Vertical) {
-      this._verticalCoordinates.push({ ...coordinates });
-    }
-
-    if (direction === Direction.DiagonalLeftToRight) {
-      this._diagonalLeftToRightCoordinates.push({ ...coordinates });
-    }
-
-    if (direction === Direction.DiagonalRightToLeft) {
-      this._diagonalRightToLeftCoordinates.push({ ...coordinates });
-    }
-  }
-
   private readDiagonalDirection(
     direction: Direction,
-    markLimit: number,
-    emptySquareLimit: number,
+    readMarkLimit: number,
+    readEmptySquareLimit: number,
     readMarkType: BoardSquareState,
-  ): void {
+  ): Coordinates[] {
+    const coordinatesArray: Coordinates[] = [];
     const { emptySquareCount, markCount }: CountResults =
       this.countSquaresByStateInDirection(0, direction, readMarkType);
-
-    if (direction === Direction.DiagonalLeftToRight)
-      this._diagonalLeftToRightCoordinates = [];
-
-    if (direction === Direction.DiagonalRightToLeft)
-      this._diagonalRightToLeftCoordinates = [];
-
-    if (markCount === markLimit && emptySquareCount === emptySquareLimit) {
-      if (this.readWinner(markLimit, emptySquareLimit)) return;
-      this.pushCoordinatesInArray(direction, 0);
+    if (
+      markCount === readMarkLimit &&
+      emptySquareCount === readEmptySquareLimit
+    ) {
+      if (this.readWinner(readMarkLimit, readEmptySquareLimit)) return [];
+      const coordinates: Coordinates[] = this.getCoordinates(0, direction);
+      coordinatesArray.push(...coordinates);
     }
+    return coordinatesArray;
   }
 
   private countSquaresByStateInDirection(
@@ -408,8 +462,8 @@ export class Board {
     return { emptySquareCount, markCount };
   }
 
-  getPotentialCoordinates(column: number, direction: Direction): Coordinates {
-    const coordinates: Coordinates = this.getEmptyCoordinates();
+  getCoordinates(column: number, direction: Direction): Coordinates[] {
+    const coordinatesArray: Coordinates[] = [];
 
     for (let row = 0; row < this._board[column].length; row++) {
       const currentSquare: BoardSquare = this.getSquareAtCoordinates(
@@ -419,32 +473,33 @@ export class Board {
       );
 
       if (currentSquare.state === BoardSquareState.EMPTY) {
+        const coordinates: Coordinates = this.getEmptyCoordinates();
         if (direction === Direction.Horizontal) {
           coordinates.y = column;
           coordinates.x = row;
-          return coordinates;
+          coordinatesArray.push(coordinates);
         }
 
         if (direction === Direction.Vertical) {
           coordinates.y = row;
           coordinates.x = column;
-          return coordinates;
+          coordinatesArray.push(coordinates);
         }
 
         if (direction === Direction.DiagonalLeftToRight) {
           coordinates.y = column + row;
           coordinates.x = row;
-          return coordinates;
+          coordinatesArray.push(coordinates);
         }
 
         if (direction === Direction.DiagonalRightToLeft) {
           coordinates.y = row;
           coordinates.x = 2 - row;
-          return coordinates;
+          coordinatesArray.push(coordinates);
         }
       }
     }
-    return coordinates;
+    return coordinatesArray;
   }
 
   private getSquareAtCoordinates(
