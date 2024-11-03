@@ -124,7 +124,7 @@ export class Board {
     }
 
     //Second turn and above
-    this.futureTurns();
+    this.secondTurn();
     this.updateBoardWithId(this._programMoveId);
   }
 
@@ -203,51 +203,63 @@ export class Board {
   }
 
   private firstTurn(): void {
-    if (this._board[1][1].state === BoardSquareState.EMPTY) {
-      this._programMoveId = this._board[1][1].id;
-    } else {
+    for (let column = 0; column < this._board.length; column++) {
+      for (let row = 0; row < this._board[column].length; row++) {
+        const currentSquare = this._board[column][row];
+
+        if (this.isSideSquareOccupied(currentSquare, [4, 6])) {
+          this.readDirection(Direction.Vertical, 1, 2, this._playerMark);
+          const coordinates: Coordinates[] = this.getAllReadCoordinates();
+          this.setProgramMoveId(coordinates);
+          return;
+        }
+
+        if (this.isSideSquareOccupied(currentSquare, [2, 8])) {
+          this.readDirection(Direction.Horizontal, 1, 2, this._playerMark);
+          const coordinates: Coordinates[] = this.getAllReadCoordinates();
+          this.setProgramMoveId(coordinates);
+          return;
+        }
+      }
+    }
+
+    if (this._board[1][1].state === BoardSquareState.EMPTY)
+      this._programMoveId = 5;
+    else {
       for (let column = 0; column < this._board.length; column++) {
-        for (let row = 0; row < this._board[column].length; row++) {
+        for (let row = 0; row < this._board[column].length; column++) {
+          const currentSquare = this._board[column][row];
           if (
-            this._board[column][row].state === BoardSquareState.EMPTY &&
+            currentSquare.state === BoardSquareState.EMPTY &&
             column !== 1 &&
             row !== 1
           ) {
-            this._programMoveId = this._board[column][row].id;
+            this._programMoveId = currentSquare.id;
+            return;
           }
         }
       }
     }
   }
 
-  private futureTurns(): void {
+  private isSideSquareOccupied(
+    currentSquare: BoardSquare,
+    sideSquareIds: number[],
+  ): boolean {
+    let sideSquareOccupied: boolean = false;
+    sideSquareIds.forEach((id: number) => {
+      if (id === currentSquare.id && currentSquare.state === this._playerMark) {
+        sideSquareOccupied = true;
+      }
+    });
+    return sideSquareOccupied;
+  }
+
+  private secondTurn(): void {
+    console.log("REST OF THE TURNS");
+
     this.readAllDirections(2, 1, this._playerMark);
-    const firstCoordinates: Coordinates[] = this.getAllReadCoordinates();
-    if (firstCoordinates.length > 0) {
-      this.setProgramMoveId(firstCoordinates);
-      return;
-    }
-
-    this.readAllDirections(1, 2, this._programMark);
-    const secondaryCoordinates: Coordinates[] = this.getAllReadCoordinates();
-    if (secondaryCoordinates.length > 0) {
-      this.setProgramMoveId(secondaryCoordinates);
-      return;
-    }
-
-    this.readAllDirections(2, 1, this._programMark);
-    const thirdCoordinates: Coordinates[] = this.getAllReadCoordinates();
-    if (thirdCoordinates.length > 0) {
-      this.setProgramMoveId(thirdCoordinates);
-      return;
-    }
-
-    this.readAllDirections(1, 1, this._programMark);
-    const fourthCoordinates: Coordinates[] = this.getAllReadCoordinates();
-    if (fourthCoordinates.length > 0) {
-      this.setProgramMoveId(fourthCoordinates);
-      return;
-    }
+    const
   }
 
   private setProgramMoveId(allCoordinates: Coordinates[]): void {
