@@ -115,7 +115,7 @@ export class Board {
     });
   }
 
-  public programMove(): void {
+  public programMove(playerMoveId: number): void {
     if (this._turnCount <= 1) {
       const programMoveId: number = this.firstTurn();
       if (programMoveId !== 0) this.updateBoardWithId(programMoveId);
@@ -124,7 +124,7 @@ export class Board {
 
     //Second turn
     if (this._turnCount === 3) {
-      const programMoveId: number = this.secondTurn();
+      const programMoveId: number = this.secondTurn(playerMoveId);
       if (programMoveId !== 0) this.updateBoardWithId(programMoveId);
       return;
     }
@@ -220,91 +220,277 @@ export class Board {
     return programMoveId;
   }
 
-  private secondTurn(): number {
-    const allCoordinates: Coordinates[] = this.readSpecifiedDirections(
+  private secondTurn(secondPlayerMoveId: number): number {
+    //Prevent player from winning
+    const preventPlayerFromWinning: Coordinates[] = this.readAllDirections(
       2,
       1,
       this._playerMark,
-      {
-        readHorizontal: true,
-        readVertical: true,
-        readDiagonalLeftToRight: true,
-        readDiagonalRightToLeft: true,
-      },
     );
-    if (allCoordinates.length === 0) {
-      //Try to make progress on winning
-      return this.programTryToWin({
-        readHorizontal: true,
-        readVertical: true,
-        readDiagonalLeftToRight: false,
-        readDiagonalRightToLeft: false,
-      });
+    if (preventPlayerFromWinning.length > 0)
+      return this.getProgramMoveId(preventPlayerFromWinning);
+
+    //Player is not winning
+
+    const playerSecondMoveCoordinates: Coordinates = this.getCoordinatesById(
+      this._playerMark,
+      secondPlayerMoveId,
+    );
+
+    const programMoveId: number = this.blockOptionsForCoordinates(
+      playerSecondMoveCoordinates,
+    );
+
+    if (programMoveId !== 0) return programMoveId;
+
+    return 0; // Don't know
+  }
+
+  private blockOptionsForCoordinates(coordinates: Coordinates): number {
+    const blockOptionsHorizontal: Coordinates =
+      this.getBlockOptionsHorizontal(coordinates);
+
+    let programMoveId: number = 0;
+
+    if (this.coordinatesEqual(blockOptionsHorizontal, coordinates)) {
+      console.log("Didn't find any horizontal block options");
+    } else {
+      console.log("blockOptionsHorizontal: ", blockOptionsHorizontal);
+      programMoveId = this.getProgramMoveId([blockOptionsHorizontal]);
     }
 
-    //Block player marks
-    return this.getProgramMoveId(allCoordinates);
+    const blockOptionsVertical: Coordinates =
+      this.getBlockOptionsVertical(coordinates);
+
+    if (this.coordinatesEqual(blockOptionsVertical, coordinates)) {
+      console.log("Didn't find any vertical block options");
+    } else {
+      console.log("blockOptionsVertical: ", blockOptionsVertical);
+      programMoveId = this.getProgramMoveId([blockOptionsVertical]);
+    }
+
+    return programMoveId;
+  }
+
+  private coordinatesEqual(
+    coordinatesA: Coordinates,
+    coordinatesB: Coordinates,
+  ): boolean {
+    return coordinatesA.x === coordinatesB.x &&
+      coordinatesA.y === coordinatesB.y
+      ? true
+      : false;
+  }
+
+  private getBlockOptionsHorizontal({ x, y }: Coordinates): Coordinates {
+    const maxCoordinate: number = 2;
+    const middleCoordinate: number = 1;
+    const minCoordinate: number = 0;
+
+    //playerMovementCoordinates
+    const blockOptions: Coordinates = {
+      x: x,
+      y: y,
+    };
+    // Check horizontaly
+    if (x === maxCoordinate && this.isSquareEmpty({ x: x - 1, y: y })) {
+      blockOptions.x -= 1;
+      return blockOptions;
+    }
+
+    if (x === minCoordinate && this.isSquareEmpty({ x: x + 1, y: y })) {
+      blockOptions.x += 1;
+      return blockOptions;
+    }
+
+    if (x === middleCoordinate) {
+      if (this.isSquareEmpty({ x: x + 1, y: y })) {
+        blockOptions.x += 1;
+        return blockOptions;
+      }
+
+      if (this.isSquareEmpty({ x: x - 1, y: y })) {
+        blockOptions.x -= 1;
+        return blockOptions;
+      }
+    }
+
+    return blockOptions;
+  }
+
+  private getBlockOptionsVertical({ x, y }: Coordinates) {
+    const maxCoordinate: number = 2;
+    const middleCoordinate: number = 1;
+    const minCoordinate: number = 0;
+
+    //playerMovementCoordinates
+    const blockOptions: Coordinates = {
+      x: x,
+      y: y,
+    };
+    // Check horizontaly
+    if (y === maxCoordinate && this.isSquareEmpty({ x: x, y: y - 1 })) {
+      blockOptions.y -= 1;
+      return blockOptions;
+    }
+
+    if (y === minCoordinate && this.isSquareEmpty({ x: x, y: y + 1 })) {
+      blockOptions.y += 1;
+      return blockOptions;
+    }
+
+    if (y === middleCoordinate) {
+      if (this.isSquareEmpty({ x: x, y: y + 1 })) {
+        blockOptions.y += 1;
+        return blockOptions;
+      }
+
+      if (this.isSquareEmpty({ x: x, y: y - 1 })) {
+        blockOptions.y -= 1;
+        return blockOptions;
+      }
+    }
+
+    return blockOptions;
+  }
+
+  private isSquareEmpty(coordinates: Coordinates): boolean {
+    const { x, y }: Coordinates = coordinates;
+
+    const currentSquare: BoardSquare = this._board[y][x];
+    if (currentSquare.state === BoardSquareState.EMPTY) return true;
+
+    return false;
+  }
+
+  private getCoordinatesById(
+    readMarkType: BoardSquareState,
+    playerMoveId: number,
+  ): Coordinates {
+    const playerOccupiedSquare: Coordinates = this.getEmptyCoordinates();
+    for (let column = 0; column < this._board.length; column++) {
+      for (let row = 0; row < this._board[column].length; row++) {
+        const currentSquare = this._board[column][row];
+        if (
+          currentSquare.id === playerMoveId &&
+          currentSquare.state === readMarkType
+        ) {
+          playerOccupiedSquare.x = row;
+          playerOccupiedSquare.y = column;
+        }
+      }
+    }
+    return playerOccupiedSquare;
   }
 
   private restOfTheTurns(): number {
-    const playerMarkBlockCoordinates: Coordinates[] =
-      this.readSpecifiedDirections(2, 1, this._playerMark, {
-        readHorizontal: true,
-        readVertical: true,
-        readDiagonalLeftToRight: true,
-        readDiagonalRightToLeft: true,
-      });
+    const programWinCoordinates: Coordinates[] = this.readAllDirections(
+      2,
+      1,
+      this._programMark,
+    );
 
-    if (playerMarkBlockCoordinates.length === 0) {
-      return this.programTryToWin({
-        readHorizontal: true,
-        readVertical: true,
-        readDiagonalLeftToRight: true,
-        readDiagonalRightToLeft: true,
-      });
+    if (programWinCoordinates.length > 0) {
+      return this.getProgramMoveId(programWinCoordinates);
     }
 
-    return this.getProgramMoveId(playerMarkBlockCoordinates);
-  }
+    const preventPlayerFromWinning: Coordinates[] = this.readAllDirections(
+      2,
+      1,
+      this._playerMark,
+    );
 
-  private programTryToWin(readDirections: ReadDirections): number {
-    let programMoveId: number = 0;
-    const oneMarkTwoEmptySquares: Coordinates[] = this.readSpecifiedDirections(
+    if (preventPlayerFromWinning.length > 0) {
+      return this.getProgramMoveId(preventPlayerFromWinning);
+    }
+
+    const placeMarkToEmptyColumn: Coordinates[] = this.readDirection(
+      Direction.Vertical,
+      1,
+      2,
+      this._playerMark,
+    );
+
+    if (placeMarkToEmptyColumn.length > 0)
+      return this.getProgramMoveId(placeMarkToEmptyColumn);
+
+    const placeMarkToEmptyRow: Coordinates[] = this.readDirection(
+      Direction.Horizontal,
+      1,
+      2,
+      this._playerMark,
+    );
+
+    if (placeMarkToEmptyRow.length > 0)
+      return this.getProgramMoveId(placeMarkToEmptyRow);
+
+    const programProgressCoordinates: Coordinates[] = this.readAllDirections(
       1,
       2,
       this._programMark,
-      readDirections,
     );
-    if (oneMarkTwoEmptySquares.length > 0) {
-      programMoveId = this.getProgramMoveId(oneMarkTwoEmptySquares);
-    } else {
-      const oneMarkOneEmptySquare: Coordinates[] = this.readSpecifiedDirections(
-        1,
-        1,
-        this._programMark,
-        readDirections,
-      );
 
-      const twoMarksOneEmptySquare: Coordinates[] =
-        this.readSpecifiedDirections(2, 1, this._programMark, readDirections);
-
-      const restOfTheCoordinates: Coordinates[] = [
-        ...oneMarkOneEmptySquare,
-        ...twoMarksOneEmptySquare,
-      ];
-
-      programMoveId = this.getProgramMoveId(restOfTheCoordinates);
+    if (programProgressCoordinates.length > 0) {
+      return this.getProgramMoveId(programProgressCoordinates);
     }
-    return programMoveId;
+
+    const lastProgramProgressCoordinates: Coordinates[] =
+      this.readAllDirections(1, 2, this._playerMark);
+
+    if (lastProgramProgressCoordinates.length > 0)
+      return this.getProgramMoveId(lastProgramProgressCoordinates);
+
+    return 0;
   }
 
   private getProgramMoveId(allCoordinates: Coordinates[]): number {
     let programMoveId: number = 0;
-    allCoordinates.forEach(({ x, y }: Coordinates) => {
+    for (let i = 0; i < allCoordinates.length; i++) {
+      const { y, x } = allCoordinates[i];
       if (this._board[y][x].state === BoardSquareState.EMPTY)
-        programMoveId = this._board[y][x].id;
-    });
+        return this._board[y][x].id;
+    }
     return programMoveId;
+  }
+
+  private readAllDirections(
+    readMarkLimit: number,
+    readEmptySquareLimit: number,
+    readMarkType: BoardSquareState,
+  ): Coordinates[] {
+    const horizontalCoordinates: Coordinates[] = this.readDirection(
+      Direction.Horizontal,
+      readMarkLimit,
+      readEmptySquareLimit,
+      readMarkType,
+    );
+    const verticalCoordinates: Coordinates[] = this.readDirection(
+      Direction.Vertical,
+      readMarkLimit,
+      readEmptySquareLimit,
+      readMarkType,
+    );
+    const diagonalLeftToRightCoordinates: Coordinates[] = this.readDirection(
+      Direction.DiagonalLeftToRight,
+      readMarkLimit,
+      readEmptySquareLimit,
+      readMarkType,
+    );
+    const diagonalRightToLeftCoordinates: Coordinates[] = this.readDirection(
+      Direction.DiagonalRightToLeft,
+      readMarkLimit,
+      readEmptySquareLimit,
+      readMarkType,
+    );
+
+    const allCoordinatesArray: Coordinates[] = [
+      ...horizontalCoordinates,
+      ...verticalCoordinates,
+      ...diagonalLeftToRightCoordinates,
+      ...diagonalRightToLeftCoordinates,
+    ];
+
+    return allCoordinatesArray;
   }
 
   private readSpecifiedDirections(
@@ -353,7 +539,6 @@ export class Board {
       allCoordinatesArray.push(...diagonalLeftToRightCoordinates);
     if (readDiagonalRightToLeft)
       allCoordinatesArray.push(...diagonalRightToLeftCoordinates);
-
     return allCoordinatesArray;
   }
 

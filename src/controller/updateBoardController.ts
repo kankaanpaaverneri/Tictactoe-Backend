@@ -8,12 +8,12 @@ export const updateBoardController = (req: Request, res: Response) => {
       .status(500)
       .json("Request invalid: Request must contain id between 1 and 9");
   }
-  const id: number = req.body.id;
+  const playerMoveid: number = req.body.id;
 
-  board.updateBoardWithId(id);
+  board.updateBoardWithId(playerMoveid);
   if (board.readWinningStatus() === WinningStatus.NO_WINNER) {
     board.switchTurn();
-    board.programMove();
+    board.programMove(playerMoveid);
     board.readWinningStatus();
     board.switchTurn();
   }
