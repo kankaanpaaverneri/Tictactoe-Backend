@@ -5,3 +5,4 @@ Handles game opponent logic and updates the game state.
 
 ### Requires
 * [NodeJs](https://nodejs.org/en)
+* [Typescript](https://www.typescriptlang.org/)
